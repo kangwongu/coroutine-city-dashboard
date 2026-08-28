@@ -1,3 +1,14 @@
 spring:
   application:
     name: coroutine-city-dashboard
+
+external-api:
+  weather:
+    base-url: https://api.openweathermap.org
+    api-key: b717d5f4fc73b54e9af08efdc5a76190
+  country:
+    base-url: https://restcountries.com/v3.1
+  holiday:
+    base-url: https://date.nager.at/api/v3
+  exchange-rate:
+    base-url: https://api.frankfurter.app
