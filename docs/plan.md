@@ -28,8 +28,6 @@ coroutine/
   src/main/resources/application.yml   # API 키, baseUrl, 타임아웃 등 외부 설정
 ```
 
-클라이언트를 인터페이스(`WeatherClient` 등)로 분리해두는 이유는 확장 단계(WireMock 테스트, 블로킹 클라이언트 비교 구현체 추가)에서 구현체만 갈아끼울 수 있게 하기 위함이다(NFR5).
-
 ## 외부 API 상세
 
 ### 날씨 — OpenWeatherMap
@@ -102,7 +100,7 @@ coroutine/
 - 각 기능 추가 시 기존 병렬/순차 비교 결과가 어떻게 달라지는지 관찰.
 
 ### Phase 6 — 테스트/부하 측정
-- WireMock으로 4개 외부 API를 목킹하고, `kotlinx-coroutines-test`(`runTest`)로 `DashboardService` 단위 테스트 작성(NFR5).
+- WireMock으로 4개 외부 API를 목킹하고, `kotlinx-coroutines-test`(`runTest`)로 `DashboardService` 단위 테스트 작성.
 - 간단한 부하 테스트(예: 동시 N개 요청)로 병렬/순차, WebClient/RestTemplate 처리량을 정량적으로 비교.
 
 ## 진행 원칙
