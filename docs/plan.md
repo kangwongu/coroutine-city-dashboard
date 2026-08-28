@@ -8,8 +8,8 @@
 coroutine/
   build.gradle.kts
   settings.gradle.kts
-  src/main/kotlin/com/example/coroutine/
-    CoroutineApplication.kt
+  src/main/kotlin/com/coroutine/city/
+    CoroutineCityDashboardApplication.kt
     config/
       WebClientConfig.kt        # 외부 API별 WebClient 빈 (baseUrl, 타임아웃 등)
     client/
@@ -65,10 +65,10 @@ coroutine/
 ## 개발 순서
 
 ### Phase 0 — 프로젝트 세팅
-- Gradle(Kotlin DSL) 초기화, Spring Boot 4.x + Kotlin + JDK 21 의존성 구성
-- `spring-boot-starter-webflux`(WebClient 사용 목적) + `kotlinx-coroutines-reactor` 추가
-- `application.yml`에 외부 API baseUrl, OpenWeatherMap 키 플레이스홀더 구성
-- 빈 컨트롤러로 `bootRun` 기동 확인
+- [x] Gradle(Kotlin DSL) 초기화, Spring Boot 4.x + Kotlin + JDK 21 의존성 구성
+- [x] `spring-boot-starter-webclient`(WebClient 사용 목적) + `kotlinx-coroutines-reactor` 추가 — Spring Boot 4 모듈화로 `spring-boot-starter-webflux` 대신 WebClient만 담은 경량 스타터인 `spring-boot-starter-webclient` 사용
+- [x] `application.yml`에 외부 API baseUrl, OpenWeatherMap 키 구성
+- [x] 컨트롤러 없이 `bootRun` 기동 확인 (Tomcat 8080 포트 정상 기동)
 
 ### Phase 1 — MVP: 완전 독립 병렬/순차 비교
 - 4개 API 클라이언트(`WeatherClient`, `CountryClient`, `HolidayClient`, `ExchangeRateClient`) 구현. 각 클라이언트는 서로 의존관계 없이 도시명/국가명/국가코드/통화코드를 파라미터로 직접 받는다(FR1).
