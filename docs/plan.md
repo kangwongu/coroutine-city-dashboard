@@ -78,11 +78,11 @@ coroutine/
 - **완료 기준**: curl 또는 Swagger UI로 두 엔드포인트를 호출해 `timingMs.total`을 비교했을 때 병렬이 유의미하게 빠름을 확인(NFR1).
 
 ### Phase 2 — 부분 실패 처리 비교
-- `fetchParallel()`은 `coroutineScope` 특성상 하나만 실패해도 전체 예외가 전파되는 fail-fast 동작을 그대로 유지.
-- `fetchParallelResilient()`(가칭)를 `supervisorScope`로 추가 구현: 각 API 실패를 개별적으로 잡아 해당 섹션만 null/에러 정보로 채우고 나머지는 정상 반환(FR4, NFR3).
-- `/api/dashboard/parallel-resilient` 엔드포인트 추가.
-- 에러 응답 형태를 통일(UX3): 실패한 API명, 실패 사유를 각 섹션에 포함.
-- **완료 기준**: 잘못된 도시명 등으로 의도적으로 한 API만 실패시켰을 때, 기존 `/parallel`은 500 에러, `/parallel-resilient`는 200 + 부분 데이터로 응답하는 차이를 확인.
+- [x] `fetchParallel()`은 `coroutineScope` 특성상 하나만 실패해도 전체 예외가 전파되는 fail-fast 동작을 그대로 유지.
+- [x] `fetchParallelResilient()`(가칭)를 `supervisorScope`로 추가 구현: 각 API 실패를 개별적으로 잡아 해당 섹션만 null/에러 정보로 채우고 나머지는 정상 반환(FR4, NFR3).
+- [x] `/api/dashboard/parallel-resilient` 엔드포인트 추가.
+- [x] 에러 응답 형태를 통일(UX3): 실패한 API명, 실패 사유를 각 섹션에 포함.
+- **완료 기준**: 잘못된 도시명 등으로 의도적으로 한 API만 실패시켰을 때, 기존 `/parallel`은 500 에러, `/parallel-resilient`는 200 + 부분 데이터로 응답하는 차이를 확인. — [x] 확인 완료
 
 ### Phase 3 — 의존관계 리팩터링
 - `CountryClient.getCountry(name)`을 먼저 호출해 국가코드/통화코드를 얻고, 이 결과를 `HolidayClient`/`ExchangeRateClient` 호출의 입력으로 사용하도록 `DashboardService`를 리팩터링(FR5).
