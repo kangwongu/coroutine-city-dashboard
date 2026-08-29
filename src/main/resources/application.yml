@@ -2,6 +2,12 @@ spring:
   application:
     name: coroutine-city-dashboard
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
 external-api:
   weather:
     base-url: https://api.openweathermap.org
