@@ -1,5 +1,6 @@
 package com.coroutine.city.controller
 
+import com.coroutine.city.dto.DashboardResilientResponse
 import com.coroutine.city.dto.DashboardResponse
 import com.coroutine.city.service.DashboardService
 import org.springframework.web.bind.annotation.GetMapping
@@ -28,4 +29,12 @@ class DashboardController(
 		@RequestParam countryCode: String,
 		@RequestParam baseCurrency: String,
 	): DashboardResponse = dashboardService.fetchSequential(city, countryName, countryCode, baseCurrency)
+
+	@GetMapping("/parallel-resilient")
+	suspend fun getParallelResilient(
+		@RequestParam city: String,
+		@RequestParam countryName: String,
+		@RequestParam countryCode: String,
+		@RequestParam baseCurrency: String,
+	): DashboardResilientResponse = dashboardService.fetchParallelResilient(city, countryName, countryCode, baseCurrency)
 }
