@@ -4,10 +4,13 @@ import com.coroutine.city.client.CountryClient
 import com.coroutine.city.client.ExchangeRateClient
 import com.coroutine.city.client.HolidayClient
 import com.coroutine.city.client.WeatherClient
+import com.coroutine.city.dto.ApiError
+import com.coroutine.city.dto.DashboardResilientResponse
 import com.coroutine.city.dto.DashboardResponse
 import com.coroutine.city.dto.TimingMs
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.supervisorScope
 import org.springframework.stereotype.Service
 
 @Service
@@ -91,10 +94,63 @@ class DashboardService(
 		)
 	}
 
+	// supervisorScope는 fail-fast가 아니다: 자식 하나가 예외를 던져도 형제 async들은 취소되지 않고
+	// 각자 끝까지 진행된다 — 단, await() 시점에 그 예외가 다시 던져지므로 여기서 개별로 잡아야 한다.
+	// timedCatching이 실패를 여기서 흡수해 ApiError로 바꿔주기 때문에 fetchParallelResilient 쪽
+	// await()들은 서로의 실패에 영향받지 않고 항상 정상 반환된다(부분 성공).
+	suspend fun fetchParallelResilient(
+		city: String,
+		countryName: String,
+		countryCode: String,
+		baseCurrency: String,
+	): DashboardResilientResponse = supervisorScope {
+		val totalStart = System.currentTimeMillis()
+
+		val weatherDeferred = async { timedCatching("weather") { weatherClient.getWeather(city) } }
+		val countryDeferred = async { timedCatching("country") { countryClient.getCountry(countryName) } }
+		val holidaysDeferred = async { timedCatching("holidays") { holidayClient.getHolidays(countryCode) } }
+		val exchangeRateDeferred = async { timedCatching("exchangeRate") { exchangeRateClient.getRates(baseCurrency) } }
+
+		val (weather, weatherError, weatherMs) = weatherDeferred.await()
+		val (country, countryError, countryMs) = countryDeferred.await()
+		val (holidays, holidaysError, holidaysMs) = holidaysDeferred.await()
+		val (exchangeRate, exchangeRateError, exchangeRateMs) = exchangeRateDeferred.await()
+
+		DashboardResilientResponse(
+			weather = weather,
+			weatherError = weatherError,
+			country = country,
+			countryError = countryError,
+			holidays = holidays,
+			holidaysError = holidaysError,
+			exchangeRate = exchangeRate,
+			exchangeRateError = exchangeRateError,
+			timingMs = TimingMs(
+				weather = weatherMs,
+				country = countryMs,
+				holidays = holidaysMs,
+				exchangeRate = exchangeRateMs,
+				total = System.currentTimeMillis() - totalStart,
+			),
+		)
+	}
+
 	// suspend 블록을 실행하고 (결과, 소요시간ms)를 함께 반환하는 헬퍼. 8곳의 반복 측정 로직을 재사용.
 	private suspend fun <T> timed(block: suspend () -> T): Pair<T, Long> {
 		val start = System.currentTimeMillis()
 		val result = block()
 		return result to System.currentTimeMillis() - start
+	}
+
+	// timed와 동일하게 측정하되 예외를 던지지 않고 ApiError로 흡수한다 — supervisorScope 자식에서
+	// 실패해도 형제 async들의 진행에 영향을 주지 않으려면 여기서 잡아야 한다(전파시키면 fail-fast와 동일해짐).
+	private suspend fun <T> timedCatching(api: String, block: suspend () -> T): Triple<T?, ApiError?, Long> {
+		val start = System.currentTimeMillis()
+		return try {
+			val result = block()
+			Triple(result, null, System.currentTimeMillis() - start)
+		} catch (e: Exception) {
+			Triple(null, ApiError(api, e.message ?: e::class.simpleName ?: "unknown"), System.currentTimeMillis() - start)
+		}
 	}
 }
