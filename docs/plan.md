@@ -73,7 +73,8 @@ coroutine/
 - `DashboardService.fetchParallel()`: `coroutineScope { }` 안에서 4개 `async { }`를 만들고 `awaitAll()`로 fan-in. 각 async 블록을 시간 측정으로 감싸 `TimingMs`를 채운다(FR2, FR3).
 - `DashboardService.fetchSequential()`: 동일한 4개 suspend 호출을 순서대로 나열해 자연스럽게 순차 실행되도록 구현.
 - `DashboardController`에 `suspend fun`으로 `/api/dashboard/parallel`, `/api/dashboard/sequential` 두 엔드포인트 추가.
-- **완료 기준**: curl로 두 엔드포인트를 호출해 `timingMs.total`을 비교했을 때 병렬이 유의미하게 빠름을 확인(NFR1).
+- `build.gradle.kts`에 `org.springdoc:springdoc-openapi-starter-webmvc-ui` 의존성을 추가하고, 기본 설정으로 Swagger UI(`/swagger-ui.html`)를 노출해 두 엔드포인트를 브라우저에서 직접 호출/검증할 수 있게 한다.
+- **완료 기준**: curl 또는 Swagger UI로 두 엔드포인트를 호출해 `timingMs.total`을 비교했을 때 병렬이 유의미하게 빠름을 확인(NFR1).
 
 ### Phase 2 — 부분 실패 처리 비교
 - `fetchParallel()`은 `coroutineScope` 특성상 하나만 실패해도 전체 예외가 전파되는 fail-fast 동작을 그대로 유지.

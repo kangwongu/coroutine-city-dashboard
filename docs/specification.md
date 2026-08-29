@@ -22,7 +22,7 @@
 
 이 프로젝트는 화면 없는 API 서버이므로, "UX"는 API 자체의 사용성·일관성 기준으로 정의한다.
 
-- **UX1.** 별도의 프론트엔드/화면은 제공하지 않는다. curl 등으로 직접 호출해 확인하는 것을 전제로 한다.
+- **UX1.** 별도의 프론트엔드/화면은 제공하지 않는다. curl 또는 Swagger UI로 직접 호출해 확인하는 것을 전제로 한다.
 - **UX2.** 모든 정상 응답은 일관된 JSON 구조(출처별 섹션 + `timingMs`)를 따른다.
 - **UX3.** 에러 응답도 일관된 형태로, 어떤 API가 왜 실패했는지 응답만으로 파악할 수 있어야 한다.
 
@@ -31,6 +31,7 @@
 - Kotlin, JDK 21
 - Spring Boot 4.x + Spring MVC — 컨트롤러/서비스는 `suspend fun` 기반으로 작성하고 WebFlux/Reactor 타입은 노출하지 않는다.
 - HTTP 클라이언트: WebClient + `kotlinx-coroutines-reactor` (MVP 기준)
+- API 문서화: `springdoc-openapi`로 Swagger UI(`/swagger-ui.html`)를 제공해 엔드포인트를 문서화하고 브라우저에서 직접 호출할 수 있게 한다.
 - 빌드: Gradle(Kotlin DSL)
 - 외부 API: OpenWeatherMap(키 필요), REST Countries, Nager.Date, Frankfurter API(모두 무키)
 
