@@ -15,7 +15,10 @@ class WebClientConfig(
 
 	@Bean
 	fun countryWebClient(): WebClient =
-		WebClient.builder().baseUrl(properties.country.baseUrl).build()
+		WebClient.builder()
+			.baseUrl(properties.country.baseUrl)
+			.defaultHeader("Authorization", "Bearer ${properties.country.apiKey}")
+			.build()
 
 	@Bean
 	fun holidayWebClient(): WebClient =

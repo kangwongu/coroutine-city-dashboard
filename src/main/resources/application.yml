@@ -13,7 +13,8 @@ external-api:
     base-url: https://api.openweathermap.org
     api-key: b717d5f4fc73b54e9af08efdc5a76190
   country:
-    base-url: https://restcountries.com/v3.1
+    base-url: https://api.restcountries.com/countries/v5
+    api-key: rc_live_553a7a5fe74f4952b01059896f8a7222
   holiday:
     base-url: https://date.nager.at/api/v3
   exchange-rate:

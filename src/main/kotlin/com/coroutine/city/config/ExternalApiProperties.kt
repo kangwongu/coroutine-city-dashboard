@@ -10,7 +10,7 @@ data class ExternalApiProperties(
 	val exchangeRate: ExchangeRate,
 ) {
 	data class Weather(val baseUrl: String, val apiKey: String)
-	data class Country(val baseUrl: String)
+	data class Country(val baseUrl: String, val apiKey: String)
 	data class Holiday(val baseUrl: String)
 	data class ExchangeRate(val baseUrl: String)
 }

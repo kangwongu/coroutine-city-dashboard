@@ -40,10 +40,11 @@ coroutine/
 
 ### 국가 정보 — REST Countries
 
-- **키 발급**: 불필요
-- **엔드포인트**: `GET https://restcountries.com/v3.1/name/{name}`
-- **응답에서 쓰는 값**: `cca2`(ISO 국가코드), `currencies`(통화코드)
-- **예시**: `https://restcountries.com/v3.1/name/south%20korea`
+- **키 발급**: 필요. v3.1(무키) API는 폐지되어 v5로 전환되면서 모든 엔드포인트에 API 키가 필수가 됐다. https://restcountries.com/sign-up 에서 가입 후 `/api-keys`에서 키 발급(무료 플랜: 월 1,000 요청). 인증은 `Authorization: Bearer {API_KEY}` 헤더로 전달.
+- **엔드포인트**: `GET https://api.restcountries.com/countries/v5/name?q={name}`
+- **응답 구조**: `{"data": {"objects": [...]}}`로 감싸여 있고, 각 원소에서 `codes.alpha_2`(ISO 국가코드), `currencies[].code`(통화코드)를 사용
+- **예시**: `https://api.restcountries.com/countries/v5/name?q=south%20korea`
+- **`application.yml` 설정 예**: `external-api.country.api-key`(무료 개인 실습용 키를 그대로 커밋, 배포하지 않는 로컬 전용 프로젝트라는 제약사항에 따름)
 
 ### 공휴일 — Nager.Date
 
