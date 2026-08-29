@@ -18,4 +18,4 @@ external-api:
   holiday:
     base-url: https://date.nager.at/api/v3
   exchange-rate:
-    base-url: https://api.frankfurter.app
+    base-url: https://api.frankfurter.dev/v1

@@ -55,11 +55,11 @@ coroutine/
 ### 환율 — Frankfurter API
 
 - **키 발급**: 불필요
-- **엔드포인트**: `GET https://api.frankfurter.app/latest`
+- **엔드포인트**: `GET https://api.frankfurter.dev/v1/latest` (구 도메인 `api.frankfurter.app`은 `api.frankfurter.dev/v1`로 301 리다이렉트됨 — WebClient는 리다이렉트를 따라가지 않으므로 반드시 새 도메인을 base-url로 사용)
 - **주요 파라미터**: `from`(기준 통화코드)
-- **예시**: `https://api.frankfurter.app/latest?from=KRW`
+- **예시**: `https://api.frankfurter.dev/v1/latest?from=KRW`
 
-> Nager.Date, Frankfurter는 스펙 변경 가능성이 있는 무료 공개 API라, 실제 클라이언트 구현(Phase 1) 시작 시점에 최신 문서로 한 번 더 확인한다. OpenWeatherMap 키는 Phase 0(프로젝트 세팅)에서 미리 발급받아 `application.yml`/환경변수에 넣어둔다.
+> Nager.Date, Frankfurter, REST Countries는 스펙 변경 가능성이 있는 무료 공개 API다. 실제로 2026-08-29 Phase 1 수동 테스트 중 Frankfurter(`frankfurter.app` → `frankfurter.dev/v1`로 301 이전)와 REST Countries(`v3.1` 무키 API 완전 폐지, `v5`부터 API 키 필수)가 문서 작성 시점과 달라진 것을 확인해 위 내용을 최신화했다. OpenWeatherMap 키는 Phase 0(프로젝트 세팅)에서 미리 발급받아 `application.yml`에 넣어뒀다.
 
 ## 개발 순서
 
