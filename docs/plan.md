@@ -85,12 +85,12 @@ coroutine/
 - **완료 기준**: 잘못된 도시명 등으로 의도적으로 한 API만 실패시켰을 때, 기존 `/parallel`은 500 에러, `/parallel-resilient`는 200 + 부분 데이터로 응답하는 차이를 확인. — [x] 확인 완료
 
 ### Phase 3 — 의존관계 체이닝 메소드 추가
-- 기존 `fetchParallel()`/`fetchSequential()`/`fetchParallelResilient()`와 대응 엔드포인트(`/parallel`, `/sequential`, `/parallel-resilient`)는 리팩터링하지 않고 시그니처·동작 그대로 유지한다(Phase 1/2 대조군 보존).
-- `DashboardService`에 `fetchParallelChained(city, countryName)`, `fetchSequentialChained(city, countryName)` 두 메소드를 새로 추가한다. `CountryClient.getCountry(countryName)`을 먼저 호출해 얻은 국가코드/통화코드를 `HolidayClient`/`ExchangeRateClient` 호출의 입력으로 사용한다(FR5).
-- 구조: `fetchParallelChained`는 `WeatherClient`를 도시명만으로 즉시 병렬 시작 → `CountryClient` 완료 후 `HolidayClient`와 `ExchangeRateClient`를 병렬로 fan-out하는 다이아몬드 구조(`coroutineScope`, fail-fast). `fetchSequentialChained`는 동일한 의존 순서(country → holiday/exchangeRate)를 병렬 없이 그대로 나열.
-- 두 메소드 모두 반환 타입은 기존 `DashboardResponse`/`TimingMs`를 그대로 재사용(새 DTO 불필요).
-- `DashboardController`에 `GET /api/dashboard/parallel-chained`, `GET /api/dashboard/sequential-chained`를 추가한다. 두 엔드포인트만 `city`+`countryName` 2개 파라미터로 입력을 단순화하고, 기존 3개 엔드포인트는 계속 4개 파라미터(city/countryName/countryCode/baseCurrency)를 그대로 받는다.
-- **완료 기준**: `countryCode`/`baseCurrency`를 직접 넘기지 않고도 `/parallel-chained`·`/sequential-chained` 응답이 정상 생성되고, 두 `timingMs.total` 비교로 병렬 이점이 유지됨을 확인. 기존 `/parallel`, `/sequential`, `/parallel-resilient`는 계속 정상 동작함을 재확인.
+- [x] 기존 `fetchParallel()`/`fetchSequential()`/`fetchParallelResilient()`와 대응 엔드포인트(`/parallel`, `/sequential`, `/parallel-resilient`)는 리팩터링하지 않고 시그니처·동작 그대로 유지한다(Phase 1/2 대조군 보존).
+- [x] `DashboardService`에 `fetchParallelChained(city, countryName)`, `fetchSequentialChained(city, countryName)` 두 메소드를 새로 추가한다. `CountryClient.getCountry(countryName)`을 먼저 호출해 얻은 국가코드/통화코드를 `HolidayClient`/`ExchangeRateClient` 호출의 입력으로 사용한다(FR5).
+- [x] 구조: `fetchParallelChained`는 `WeatherClient`를 도시명만으로 즉시 병렬 시작 → `CountryClient` 완료 후 `HolidayClient`와 `ExchangeRateClient`를 병렬로 fan-out하는 다이아몬드 구조(`coroutineScope`, fail-fast). `fetchSequentialChained`는 동일한 의존 순서(country → holiday/exchangeRate)를 병렬 없이 그대로 나열.
+- [x] 두 메소드 모두 반환 타입은 기존 `DashboardResponse`/`TimingMs`를 그대로 재사용(새 DTO 불필요).
+- [x] `DashboardController`에 `GET /api/dashboard/parallel-chained`, `GET /api/dashboard/sequential-chained`를 추가한다. 두 엔드포인트만 `city`+`countryName` 2개 파라미터로 입력을 단순화하고, 기존 3개 엔드포인트는 계속 4개 파라미터(city/countryName/countryCode/baseCurrency)를 그대로 받는다.
+- **완료 기준**: `countryCode`/`baseCurrency`를 직접 넘기지 않고도 `/parallel-chained`·`/sequential-chained` 응답이 정상 생성되고, 두 `timingMs.total` 비교로 병렬 이점이 유지됨을 확인. 기존 `/parallel`, `/sequential`, `/parallel-resilient`는 계속 정상 동작함을 재확인. — [x] 확인 완료
 
 ### Phase 4 — 블로킹 클라이언트 비교
 - `RestTemplate` 기반 클라이언트 구현체를 추가하고, `withContext(Dispatchers.IO)`로 감싸 suspend 함수화(FR6).
