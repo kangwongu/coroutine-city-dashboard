@@ -135,6 +135,94 @@ class DashboardService(
 		)
 	}
 
+	// weather는 city만으로 즉시 async 시작, country는 먼저 완료시켜 국가코드/통화코드를 얻은 뒤
+	// holidays·exchangeRate를 그 값으로 fan-out하는 다이아몬드 구조. coroutineScope라 fail-fast.
+	//
+	//        ┌─ weather ────────────────┐
+	// start ─┤                          ├─ 완료
+	//        └─ country ─┬─ holidays ───┤
+	//                     └─ exchangeRate ┘
+	//
+	// 총 소요시간은 max(weather, country + max(holidays, exchangeRate))에 수렴한다.
+	suspend fun fetchParallelChained(
+		city: String,
+		countryName: String,
+	): DashboardResponse = coroutineScope {
+		val totalStart = System.currentTimeMillis()
+
+		// weather는 country의 결과를 전혀 필요로 하지 않으므로, 나중에 값을 쓸 걸 알면서도
+		// 미리 async로 열어 country를 기다리는 동안 그 시간을 겹쳐 쓴다.
+		val weatherDeferred = async { timed { weatherClient.getWeather(city) } }
+		// country는 async로 열지 않는다 — async는 "결과가 필요한 시점보다 미리 시작해서
+		// 대기 시간을 다른 작업과 겹치게" 할 때 의미가 있는데, country는 받자마자 바로
+		// 다음 줄(countryCode/baseCurrency 추출)에서 곧장 값을 소비하므로 미리 시작해서
+		// 벌 수 있는 시간이 없다. 그냥 suspend fun을 직접 호출해도 결과는 동일하고,
+		// 이미 그 직전 줄에서 weather 요청이 나가 있는 상태라 weather와는 어차피 겹쳐 돈다.
+		val (country, countryMs) = timed { countryClient.getCountry(countryName) }
+
+		val countryCode = country.codes.alpha2
+		val baseCurrency = country.currencies?.first()?.code
+			?: throw IllegalStateException("국가 정보에 통화 코드가 없습니다: $countryName")
+
+		// holidays와 exchangeRate는 둘 다 country 완료 이후에만 시작할 수 있지만, 서로는
+		// 완전히 독립적이라 순서대로 기다릴 이유가 없다 → 이 둘만 다시 async로 fan-out.
+		val holidaysDeferred = async { timed { holidayClient.getHolidays(countryCode) } }
+		val exchangeRateDeferred = async { timed { exchangeRateClient.getRates(baseCurrency) } }
+
+		val (weather, weatherMs) = weatherDeferred.await()
+		val (holidays, holidaysMs) = holidaysDeferred.await()
+		val (exchangeRate, exchangeRateMs) = exchangeRateDeferred.await()
+
+		DashboardResponse(
+			weather = weather,
+			country = country,
+			holidays = holidays,
+			exchangeRate = exchangeRate,
+			timingMs = TimingMs(
+				weather = weatherMs,
+				country = countryMs,
+				holidays = holidaysMs,
+				exchangeRate = exchangeRateMs,
+				total = System.currentTimeMillis() - totalStart,
+			),
+		)
+	}
+
+	// weather → country → (country 결과로) holidays → exchangeRate 순서로 전부 순차 호출.
+	// fetchParallelChained와 달리 weather조차 country를 기다린 뒤에야 시작하고, holidays와
+	// exchangeRate도 서로 순서대로 실행된다 — async가 하나도 없으니 겹치는 구간이 전혀 없고
+	// 총 소요시간은 4개를 그대로 더한 값(weather + country + holidays + exchangeRate)이 된다.
+	suspend fun fetchSequentialChained(
+		city: String,
+		countryName: String,
+	): DashboardResponse {
+		val totalStart = System.currentTimeMillis()
+
+		val (weather, weatherMs) = timed { weatherClient.getWeather(city) }
+		val (country, countryMs) = timed { countryClient.getCountry(countryName) }
+
+		val countryCode = country.codes.alpha2
+		val baseCurrency = country.currencies?.first()?.code
+			?: throw IllegalStateException("국가 정보에 통화 코드가 없습니다: $countryName")
+
+		val (holidays, holidaysMs) = timed { holidayClient.getHolidays(countryCode) }
+		val (exchangeRate, exchangeRateMs) = timed { exchangeRateClient.getRates(baseCurrency) }
+
+		return DashboardResponse(
+			weather = weather,
+			country = country,
+			holidays = holidays,
+			exchangeRate = exchangeRate,
+			timingMs = TimingMs(
+				weather = weatherMs,
+				country = countryMs,
+				holidays = holidaysMs,
+				exchangeRate = exchangeRateMs,
+				total = System.currentTimeMillis() - totalStart,
+			),
+		)
+	}
+
 	// suspend 블록을 실행하고 (결과, 소요시간ms)를 함께 반환하는 헬퍼. 8곳의 반복 측정 로직을 재사용.
 	private suspend fun <T> timed(block: suspend () -> T): Pair<T, Long> {
 		val start = System.currentTimeMillis()
