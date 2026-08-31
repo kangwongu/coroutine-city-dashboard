@@ -37,4 +37,16 @@ class DashboardController(
 		@RequestParam countryCode: String,
 		@RequestParam baseCurrency: String,
 	): DashboardResilientResponse = dashboardService.fetchParallelResilient(city, countryName, countryCode, baseCurrency)
+
+	@GetMapping("/parallel-chained")
+	suspend fun getParallelChained(
+		@RequestParam city: String,
+		@RequestParam countryName: String,
+	): DashboardResponse = dashboardService.fetchParallelChained(city, countryName)
+
+	@GetMapping("/sequential-chained")
+	suspend fun getSequentialChained(
+		@RequestParam city: String,
+		@RequestParam countryName: String,
+	): DashboardResponse = dashboardService.fetchSequentialChained(city, countryName)
 }
