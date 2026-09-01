@@ -9,6 +9,9 @@ springdoc:
     path: /swagger-ui.html
 
 external-api:
+  # 아래 API 키들은 의도적으로 평문 커밋한다.
+  # 배포하지 않고 로컬에서만 띄우는 개인 연습용 프로젝트이고, 두 키 모두 무료 플랜이라
+  # 공개 저장소에 노출돼도 감수할 수 있다고 판단해 별도 시크릿 관리 없이 코드에 둔다.
   weather:
     base-url: https://api.openweathermap.org
     api-key: b717d5f4fc73b54e9af08efdc5a76190
