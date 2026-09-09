@@ -2,6 +2,23 @@ spring:
   application:
     name: coroutine-city-dashboard
 
+server:
+  tomcat:
+    threads:
+      # Phase 4 블로킹 클라이언트 비교 실험용으로 의도적으로 낮게 설정.
+      # 적은 수의 동시 요청으로도 톰캣 스레드 풀 소진 여부 차이가 드러나게 한다.
+      max: 10
+    mbeanregistry:
+      # 내장 톰캣은 기본적으로 스레드풀 MBean을 등록하지 않아 tomcat.threads.busy 등
+      # 액추에이터 메트릭이 노출되지 않는다. 부하 테스트에서 스레드 점유량을 확인하려면 필요.
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, metrics
+
 springdoc:
   api-docs:
     path: /v3/api-docs
