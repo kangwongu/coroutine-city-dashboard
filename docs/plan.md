@@ -93,10 +93,14 @@ coroutine/
 - **완료 기준**: `countryCode`/`baseCurrency`를 직접 넘기지 않고도 `/parallel-chained`·`/sequential-chained` 응답이 정상 생성되고, 두 `timingMs.total` 비교로 병렬 이점이 유지됨을 확인. 기존 `/parallel`, `/sequential`, `/parallel-resilient`는 계속 정상 동작함을 재확인. — [x] 확인 완료
 
 ### Phase 4 — 블로킹 클라이언트 비교
-- `RestTemplate` 기반 클라이언트 구현체를 추가하고, `withContext(Dispatchers.IO)`로 감싸 suspend 함수화(FR6).
-- 기존 WebClient 구현체와 스프링 프로필 또는 별도 엔드포인트로 전환 가능하게 구성.
-- 간단한 동시 요청(예: 여러 도시를 동시에 여러 번 호출)을 걸어 스레드 점유/처리량 차이를 비교.
-- **완료 기준**: 동시 요청 부하 상황에서 WebClient 버전과 RestTemplate 버전의 응답 지연/스레드 사용량 차이를 관찰하고 기록.
+- [x] 전환 방식은 스프링 프로필이 아니라 별도 엔드포인트로 확정. 프로필 전환 없이 한 번 기동한 서버에서 WebClient/RestTemplate 양쪽을 동시에 호출·비교한다.
+- [x] `RestTemplateConfig.kt`에 `WebClientConfig`와 1:1 대응하는 `RestTemplate` Bean 4개(weather/country/holiday/exchangeRate) 구성. Spring Boot 4.1.1은 모듈화로 `RestTemplateBuilder`가 `spring-boot-starter-web`에 더 이상 딸려오지 않아 `spring-boot-starter-restclient`를 별도로 추가했고, `rootUri(...)`가 4.1.0부터 deprecated라 `baseUri(...)`로 구현.
+- [x] `WeatherClientBlocking`/`CountryClientBlocking`/`HolidayClientBlocking`/`ExchangeRateClientBlocking` 4종을 신규 추가. 각각 `RestTemplate` 호출을 `withContext(Dispatchers.IO)`로 감싸 suspend 함수화했다(FR6). `HolidayClient`/`ExchangeRateClient`의 `delay(2000)`/`delay(3000)`은 블로킹 버전에서 `Thread.sleep`으로 동일하게 재현(지연이 없으면 부하 테스트에서 스레드 점유 차이가 잘 드러나지 않는다).
+- [x] `DashboardService`에 `fetchParallelBlocking()`/`fetchSequentialBlocking()`을 기존 `fetchParallel()`/`fetchSequential()`과 동일한 구조로 추가. 여기에 더해, 톰캣 스레드 점유를 실제로 재현하는 안티패턴 대조군 `fetchParallelBlockingNaive()`(plain `fun` + `runBlocking`)를 세 번째 갈래로 도입 — `withContext(Dispatchers.IO)` + `suspend fun` 조합만으로는 Spring MVC가 비동기 디스패치로 처리해 실제로 점유되는 게 톰캣 스레드가 아니라 `Dispatchers.IO` 풀이라, "톰캣 스레드 풀 소진"이라는 완료 기준을 실측하려면 이 세 번째 경로가 필요했다.
+- [x] `DashboardController`에 `GET /api/dashboard/parallel-blocking`, `/sequential-blocking`(둘 다 `suspend fun`), `/parallel-blocking-naive`(plain `fun`) 3개 엔드포인트 추가. 기존 5개 엔드포인트는 무수정 유지.
+- [x] 관찰을 뒷받침하기 위해 `spring-boot-starter-actuator`를 추가하고, `server.tomcat.threads.max: 10`으로 낮춰 적은 동시 요청으로도 효과가 드러나게 했다. 내장 톰캣은 기본적으로 스레드풀 MBean을 등록하지 않아 `tomcat.threads.busy` 메트릭이 노출되지 않는 문제가 있어 `server.tomcat.mbeanregistry.enabled: true`도 추가로 켰다.
+- [x] `scripts/load-test-phase4.sh` — k6/ab/wrk 없이 bash + curl 백그라운드 동시 실행으로 `parallel`/`parallel-blocking`/`parallel-blocking-naive` 3갈래에 각각 동시 15건을 쏘고, `tomcat.threads.busy`와 `jvm.threads.live`를 함께 폴링(전자는 톰캣 커넥터 풀만 보고 `Dispatchers.IO` 풀은 잡지 못해 후자로 보완).
+- **완료 기준**: 동시 요청 부하 상황에서 WebClient 버전과 RestTemplate 버전의 응답 지연/스레드 사용량 차이를 관찰하고 기록. — [x] 확인 완료. `parallel`/`parallel-blocking`은 busy 스레드가 낮게 유지되고 응답시간이 균일했지만(약 3.0~3.2초, 15건), `parallel-blocking-naive`만 톰캣 스레드(max=10)가 소진돼 15건 중 뒤 5건이 큐잉되며 응답시간이 2단계로 갈라짐(앞 10건 약 3.05초, 뒤 5건 약 6.1초). 다만 `tomcat.threads.busy`만 보면 `parallel-blocking`이 완전히 논블로킹인 것처럼 보이는데, `jvm.threads.live`로 보완 관찰하니 `Dispatchers.IO` 풀 사용으로 JVM 전체 스레드 수가 47 → 106개로 늘어난 걸 확인했다 — 블로킹이 사라진 게 아니라 톰캣 풀에서 `Dispatchers.IO` 풀로 점유 위치만 옮겨간 것. 세부 수치와 원인 분석은 `docs/phase-4-load-test-results.md`에 정리했다.
 
 ### Phase 5 — 실무 기능 추가
 - 캐싱(Caffeine) 적용 — 동일 도시 반복 조회 시 외부 API 재호출 생략.
