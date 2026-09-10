@@ -86,4 +86,34 @@ class DashboardController(
 		@RequestParam city: String,
 		@RequestParam countryName: String,
 	): DashboardResponse = dashboardService.fetchSequentialChained(city, countryName)
+
+	// RestTemplate + withContext(Dispatchers.IO) 기반 FR6 정석 구현. suspend fun이라 위 11~47행
+	// 설명대로 톰캣 스레드는 즉시 반납되고, 대기 중 실제로 점유되는 건 Dispatchers.IO 스레드 풀이다.
+	@GetMapping("/parallel-blocking")
+	suspend fun getParallelBlocking(
+		@RequestParam city: String,
+		@RequestParam countryName: String,
+		@RequestParam countryCode: String,
+		@RequestParam baseCurrency: String,
+	): DashboardResponse = dashboardService.fetchParallelBlocking(city, countryName, countryCode, baseCurrency)
+
+	@GetMapping("/sequential-blocking")
+	suspend fun getSequentialBlocking(
+		@RequestParam city: String,
+		@RequestParam countryName: String,
+		@RequestParam countryCode: String,
+		@RequestParam baseCurrency: String,
+	): DashboardResponse = dashboardService.fetchSequentialBlocking(city, countryName, countryCode, baseCurrency)
+
+	// 안티패턴 대조군. fetchParallelBlockingNaive가 plain fun이라 여기서도 suspend를 쓸 수 없어
+	// 자연히 plain fun이 된다 — 위 11~47행에서 이론으로 설명한 "fun + runBlocking" 경로를 실제로
+	// 타는 유일한 엔드포인트라, 이 요청을 받은 톰캣 스레드는 4개 API 중 가장 느린 응답이 올 때까지
+	// (여기서는 Thread.sleep(3000)이 있는 exchangeRate가 최소 하한) 그대로 붙잡혀 있는다.
+	@GetMapping("/parallel-blocking-naive")
+	fun getParallelBlockingNaive(
+		@RequestParam city: String,
+		@RequestParam countryName: String,
+		@RequestParam countryCode: String,
+		@RequestParam baseCurrency: String,
+	): DashboardResponse = dashboardService.fetchParallelBlockingNaive(city, countryName, countryCode, baseCurrency)
 }
