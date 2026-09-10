@@ -1,15 +1,20 @@
 package com.coroutine.city.service
 
 import com.coroutine.city.client.CountryClient
+import com.coroutine.city.client.CountryClientBlocking
 import com.coroutine.city.client.ExchangeRateClient
+import com.coroutine.city.client.ExchangeRateClientBlocking
 import com.coroutine.city.client.HolidayClient
+import com.coroutine.city.client.HolidayClientBlocking
 import com.coroutine.city.client.WeatherClient
+import com.coroutine.city.client.WeatherClientBlocking
 import com.coroutine.city.dto.ApiError
 import com.coroutine.city.dto.DashboardResilientResponse
 import com.coroutine.city.dto.DashboardResponse
 import com.coroutine.city.dto.TimingMs
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.supervisorScope
 import org.springframework.stereotype.Service
 
@@ -19,6 +24,10 @@ class DashboardService(
 	private val countryClient: CountryClient,
 	private val holidayClient: HolidayClient,
 	private val exchangeRateClient: ExchangeRateClient,
+	private val weatherClientBlocking: WeatherClientBlocking,
+	private val countryClientBlocking: CountryClientBlocking,
+	private val holidayClientBlocking: HolidayClientBlocking,
+	private val exchangeRateClientBlocking: ExchangeRateClientBlocking,
 ) {
 
 	// async 4개를 동시에 띄우고 await으로 모은다 → 총 소요시간은 4개의 합이 아니라 가장 느린 것 하나.
@@ -221,6 +230,93 @@ class DashboardService(
 				total = System.currentTimeMillis() - totalStart,
 			),
 		)
+	}
+
+	// fetchParallel()과 완전히 동일한 구조(coroutineScope + 4개 async + timed 재사용)에서
+	// WebClient 클라이언트만 *ClientBlocking(RestTemplate + withContext(Dispatchers.IO))으로
+	// 교체한 대조군. suspend fun이라 MVC가 비동기 디스패치로 처리하므로, 대기 중 실제로 점유되는
+	// 스레드는 톰캣 워커가 아니라 Dispatchers.IO 풀이다 — fetchParallelBlockingNaive와 대조된다.
+	suspend fun fetchParallelBlocking(
+		city: String,
+		countryName: String,
+		countryCode: String,
+		baseCurrency: String,
+	): DashboardResponse = coroutineScope {
+		val totalStart = System.currentTimeMillis()
+
+		val weatherDeferred = async { timed { weatherClientBlocking.getWeather(city) } }
+		val countryDeferred = async { timed { countryClientBlocking.getCountry(countryName) } }
+		val holidaysDeferred = async { timed { holidayClientBlocking.getHolidays(countryCode) } }
+		val exchangeRateDeferred = async { timed { exchangeRateClientBlocking.getRates(baseCurrency) } }
+
+		val (weather, weatherMs) = weatherDeferred.await()
+		val (country, countryMs) = countryDeferred.await()
+		val (holidays, holidaysMs) = holidaysDeferred.await()
+		val (exchangeRate, exchangeRateMs) = exchangeRateDeferred.await()
+
+		DashboardResponse(
+			weather = weather,
+			country = country,
+			holidays = holidays,
+			exchangeRate = exchangeRate,
+			timingMs = TimingMs(
+				weather = weatherMs,
+				country = countryMs,
+				holidays = holidaysMs,
+				exchangeRate = exchangeRateMs,
+				total = System.currentTimeMillis() - totalStart,
+			),
+		)
+	}
+
+	// fetchSequential()과 완전히 동일한 구조로 *ClientBlocking 4종을 순서대로 호출한다.
+	suspend fun fetchSequentialBlocking(
+		city: String,
+		countryName: String,
+		countryCode: String,
+		baseCurrency: String,
+	): DashboardResponse {
+		val totalStart = System.currentTimeMillis()
+
+		val (weather, weatherMs) = timed { weatherClientBlocking.getWeather(city) }
+		val (country, countryMs) = timed { countryClientBlocking.getCountry(countryName) }
+		val (holidays, holidaysMs) = timed { holidayClientBlocking.getHolidays(countryCode) }
+		val (exchangeRate, exchangeRateMs) = timed { exchangeRateClientBlocking.getRates(baseCurrency) }
+
+		return DashboardResponse(
+			weather = weather,
+			country = country,
+			holidays = holidays,
+			exchangeRate = exchangeRate,
+			timingMs = TimingMs(
+				weather = weatherMs,
+				country = countryMs,
+				holidays = holidaysMs,
+				exchangeRate = exchangeRateMs,
+				total = System.currentTimeMillis() - totalStart,
+			),
+		)
+	}
+
+	// 안티패턴 대조군: 일부러 suspend가 아닌 plain fun으로 선언하고 runBlocking으로 감쌌다.
+	// 이걸 호출하는 컨트롤러 메소드도 plain fun일 수밖에 없는데, 그러면 MVC는 이 요청을 일반 동기
+	// 서블릿 처리로 다뤄 톰캣 워커 스레드가 runBlocking { } 블록이 끝날 때까지(=가장 느린 외부 API
+	// 응답이 올 때까지) 반납되지 않고 그 자리에서 계속 붙잡혀 있는다 — DashboardController.kt
+	// 11~47행에서 이론으로 설명한 "fun + runBlocking" 안티패턴을 실제로 재현하는 경로.
+	//
+	// 핵심: 내부의 fetchParallelBlocking()은 여전히 coroutineScope + 4개 async라 4개 API 호출
+	// 자체는 병렬로 나간다. 그래서 단발 요청의 응답 속도(latency)는 fetchParallelBlocking()을
+	// suspend fun으로 직접 호출했을 때와 동일하다 — runBlocking을 씌운다고 이 요청 자체가
+	// 느려지는 게 아니다. 차이는 오직 "그 대기 시간 동안 이 요청을 처리한 톰캣 스레드가 반납되어
+	// 다른 요청을 받을 수 있는가"이며, 이는 동시 요청이 몰렸을 때만(=스레드 풀이 고갈될 때만)
+	// 드러난다. 즉 이건 개별 요청의 속도 문제가 아니라 서버의 동시 처리량(스레드 점유) 문제다.
+	fun fetchParallelBlockingNaive(
+		city: String,
+		countryName: String,
+		countryCode: String,
+		baseCurrency: String,
+	): DashboardResponse = runBlocking {
+		fetchParallelBlocking(city, countryName, countryCode, baseCurrency)
 	}
 
 	// suspend 블록을 실행하고 (결과, 소요시간ms)를 함께 반환하는 헬퍼. 8곳의 반복 측정 로직을 재사용.
